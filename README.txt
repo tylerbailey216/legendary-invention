@@ -4,6 +4,12 @@ How to run
 - Double-click "Start Paint Lab Coloring App.cmd" to launch in your default browser.
 - Or open index.html directly.
 
+Share (easiest setup)
+- Publish this folder with GitHub Pages and share this URL:
+  https://tylerbailey216.github.io/legendary-invention/
+- Do not share the GitHub repo URL if you want an interactive experience.
+- Social preview image is preconfigured to: social-preview.png (1200x630).
+
 Offline use
 - Fully self-contained; no internet required.
 - Use "Upload" in the sidebar to add your own images (PNG/JPG/WebP/GIF).
