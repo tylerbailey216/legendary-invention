@@ -2666,14 +2666,14 @@
 
   // ---------- Seasonal curated library ----------
   // Admin update path for each season release:
-  // 1) Edit season-library.js in this same folder.
-  // 2) Add/remove approved image files in this same folder.
+  // 1) Drop approved image files into ./season-images/.
+  // 2) Run "Update Season Library.cmd" to rebuild season-library.js.
   // 3) Keep IMAGE_SOURCE_MODE as 'curated' to disable user uploads.
-  // 4) Refresh locally, then deploy/push the updated files.
+  // 4) Refresh locally, then commit/push the updated season files.
   const SEASON_LIBRARY_SCRIPT_PATH = './season-library.js';
   const SEASON_LIBRARY_GLOBAL_KEY = 'PAINT_LAB_SEASON_LIBRARY';
   const DEFAULT_PRESET_IMAGES = [
-    { name: 'themobilepaintlablogoBandW.png', url: 'themobilepaintlablogoBandW.png' }
+    { name: 'themobilepaintlablogoBandW.png', url: 'season-images/themobilepaintlablogoBandW.png' }
   ];
   let activeSeasonLabel = '';
   let seasonLibraryLoadPromise = null;

@@ -16,14 +16,16 @@ Offline use
 - Users select pages from the preloaded Images list.
 
 Season admin library
-- Edit `season-library.js` in the app root for each new season release.
-- Add approved image files to the same folder and list them in the `images` array.
-- If you reuse a filename, update the manifest `version` value too so browsers pull the fresh artwork.
+- Drop approved image files into `season-images\`.
+- Double-click `Update Season Library.cmd` to rebuild `season-library.js` from that folder.
+- The script scans common image types (`.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`) and lists them in filename order.
+- Change the season label/version when prompted. If you reuse a filename, always use a new version token so browsers pull the fresh artwork.
 - Keep `IMAGE_SOURCE_MODE = 'curated'` in `index.html` to keep uploads disabled.
 - Local desktop launch and GitHub Pages both read from the same `season-library.js` manifest.
 - The in-app `Reload Seasonal Library (Admin)` control is only enabled on local admin hosts (`localhost` or `file://`).
 - On public/user-facing hosts, that admin control is hidden and blocked.
 - To re-enable user uploads later, change mode to `'userUpload'`.
+- Legacy `season-library.json` is no longer used.
 
 Core tools
 - Brush, Fill, Gradient, Eraser, Eyedropper.
