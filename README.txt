@@ -12,8 +12,18 @@ Share (easiest setup)
 
 Offline use
 - Fully self-contained; no internet required.
-- Use "Upload" in the sidebar to add your own images (PNG/JPG/WebP/GIF).
-- Optional upload converter: "Convert Uploads To Transparent Line Art" turns photos/images into black line art on a transparent background before adding them.
+- Current default mode is curated library only (user uploads are disabled).
+- Users select pages from the preloaded Images list.
+
+Season admin library
+- Edit `season-library.js` in the app root for each new season release.
+- Add approved image files to the same folder and list them in the `images` array.
+- If you reuse a filename, update the manifest `version` value too so browsers pull the fresh artwork.
+- Keep `IMAGE_SOURCE_MODE = 'curated'` in `index.html` to keep uploads disabled.
+- Local desktop launch and GitHub Pages both read from the same `season-library.js` manifest.
+- The in-app `Reload Seasonal Library (Admin)` control is only enabled on local admin hosts (`localhost` or `file://`).
+- On public/user-facing hosts, that admin control is hidden and blocked.
+- To re-enable user uploads later, change mode to `'userUpload'`.
 
 Core tools
 - Brush, Fill, Gradient, Eraser, Eyedropper.
@@ -32,7 +42,7 @@ Core tools
 Notes
 - Works from any folder or USB drive.
 - Download button saves the current colored image as PNG.
-- Uploads are appended to the image list (they do not replace existing images).
+- In curated mode, users select from the seasonal image list (no direct file uploads).
 - Black line strokes are rendered above colors so outlines stay visible.
 
 Keyboard shortcuts
@@ -50,5 +60,9 @@ VS Code / Codex start
 - Main file: index.html
 - Run locally: double-click Start Paint Lab Coloring App.cmd
 - Converter integration point (for future module split): appendUploadedFiles() and convertImageFileToTransparentLineArt().
+
+
+
+
 
 
