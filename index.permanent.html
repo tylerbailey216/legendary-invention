@@ -663,6 +663,11 @@
   const IS_TOUCH_DEVICE = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
   let touchMode = IS_TOUCH_DEVICE ? 'pan' : 'draw';
   let touchScrollHintShown = false;
+  const TOUCH_TAP_MAX_MOVE_PX = 14;
+  const TOUCH_TAP_MAX_DURATION_MS = 450;
+  let touchTapCandidate = null;
+  const activeTouchPointers = new Set();
+  let touchGesturePanActive = false;
 
   const MIN_CANVAS_SCALE = 0.2;
   const MAX_CANVAS_SCALE = 4;
@@ -1142,11 +1147,14 @@
 
     const drawMode = touchMode === 'draw';
     if (touchModeBtn) {
-      touchModeBtn.textContent = drawMode ? 'Touch: Draw' : 'Touch: Scroll';
+      touchModeBtn.textContent = (drawMode && touchGesturePanActive)
+        ? 'Touch: Draw (2-finger pan)'
+        : (drawMode ? 'Touch: Draw' : 'Touch: Scroll');
       touchModeBtn.classList.toggle('active', drawMode);
     }
 
-    canvas.style.touchAction = drawMode ? 'none' : 'pan-x pan-y pinch-zoom';
+    const effectiveDrawMode = drawMode && !touchGesturePanActive;
+    canvas.style.touchAction = effectiveDrawMode ? 'none' : 'pan-x pan-y pinch-zoom';
   }
 
   function isCompactLayout() {
@@ -1191,12 +1199,18 @@
   function setTouchMode(nextMode, silent = false) {
     touchMode = nextMode === 'draw' ? 'draw' : 'pan';
     if (touchMode === 'draw') touchScrollHintShown = false;
+    if (touchMode !== 'draw') {
+      touchGesturePanActive = false;
+      clearTouchTapCandidate();
+      cancelPointerStroke();
+    }
+    updateTouchGesturePanState();
     updateTouchModeUI();
 
     if (!silent) {
       setStatus(
         touchMode === 'draw'
-          ? 'Touch mode: Draw. Drag on image to paint.'
+          ? 'Touch mode: Draw. Drag on image to paint. Use 2 fingers to pan/zoom.'
           : 'Touch mode: Scroll. Swipe to move around the full image.'
       );
     }
@@ -2417,6 +2431,72 @@
     return true;
   }
 
+  function isTapTool(tool) {
+    return tool === 'picker' || tool === 'fill' || tool === 'gradient';
+  }
+
+  function runTapToolAction(tool, x, y) {
+    if (tool === 'picker') {
+      pickColor(x, y);
+      return true;
+    }
+
+    if (tool === 'fill') {
+      const before = snapshotColorLayer();
+      const changed = floodFill(x, y, currentColor);
+
+      if (!changed) {
+        setStatus('Nothing to fill at this point.');
+        return false;
+      }
+
+      pushHistorySnapshot(before);
+      drawComposite();
+      saveColorLayerFor(imgIndex);
+      setStatus('Filled area.');
+      return true;
+    }
+
+    if (tool === 'gradient') {
+      const before = snapshotColorLayer();
+      const changed = gradientFill(x, y);
+
+      if (!changed) {
+        setStatus('Nothing to fill at this point.');
+        return false;
+      }
+
+      pushHistorySnapshot(before);
+      drawComposite();
+      saveColorLayerFor(imgIndex);
+      setStatus('Gradient filled area.');
+      return true;
+    }
+
+    return false;
+  }
+
+  function clearTouchTapCandidate(releaseCapture = true) {
+    if (!touchTapCandidate) return;
+    const pointerId = touchTapCandidate.pointerId;
+    touchTapCandidate = null;
+    if (releaseCapture && pointerId != null) {
+      try { canvas.releasePointerCapture(pointerId); } catch (err) { /* no-op */ }
+    }
+  }
+
+  function updateTouchGesturePanState() {
+    const shouldPan = touchMode === 'draw' && activeTouchPointers.size >= 2;
+    if (shouldPan === touchGesturePanActive) return;
+
+    touchGesturePanActive = shouldPan;
+    if (touchGesturePanActive) {
+      clearTouchTapCandidate();
+      cancelPointerStroke();
+    }
+
+    updateTouchModeUI();
+  }
   function clearCurrentPage() {
     if (!images.length) return;
 
@@ -2738,6 +2818,16 @@
   canvas.addEventListener('pointerdown', (e) => {
     if (!images.length) return;
 
+    if (e.pointerType === 'touch') {
+      activeTouchPointers.add(e.pointerId);
+      updateTouchGesturePanState();
+
+      if (touchGesturePanActive) {
+        e.preventDefault();
+        return;
+      }
+    }
+
     if (e.pointerType === 'touch' && touchMode !== 'draw') {
       if (!touchScrollHintShown) {
         setStatus('Touch mode is Scroll. Tap "Touch: Scroll" to switch to Draw.');
@@ -2748,40 +2838,23 @@
 
     const { x, y } = getCanvasPoint(e);
 
-    if (currentTool === 'picker') {
-      pickColor(x, y);
+    if (e.pointerType === 'touch' && isTapTool(currentTool)) {
+      clearTouchTapCandidate();
+      touchTapCandidate = {
+        pointerId: e.pointerId,
+        tool: currentTool,
+        x,
+        y,
+        startedAt: performance.now(),
+        canceled: false
+      };
+      try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* no-op */ }
+      e.preventDefault();
       return;
     }
 
-    if (currentTool === 'fill') {
-      const before = snapshotColorLayer();
-      const changed = floodFill(x, y, currentColor);
-
-      if (!changed) {
-        setStatus('Nothing to fill at this point.');
-        return;
-      }
-
-      pushHistorySnapshot(before);
-      drawComposite();
-      saveColorLayerFor(imgIndex);
-      setStatus('Filled area.');
-      return;
-    }
-
-    if (currentTool === 'gradient') {
-      const before = snapshotColorLayer();
-      const changed = gradientFill(x, y);
-
-      if (!changed) {
-        setStatus('Nothing to fill at this point.');
-        return;
-      }
-
-      pushHistorySnapshot(before);
-      drawComposite();
-      saveColorLayerFor(imgIndex);
-      setStatus('Gradient filled area.');
+    if (isTapTool(currentTool)) {
+      runTapToolAction(currentTool, x, y);
       return;
     }
 
@@ -2800,6 +2873,19 @@
   });
 
   canvas.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'touch') {
+      if (touchTapCandidate && e.pointerId === touchTapCandidate.pointerId) {
+        const { x, y } = getCanvasPoint(e);
+        if (Math.hypot(x - touchTapCandidate.x, y - touchTapCandidate.y) > TOUCH_TAP_MAX_MOVE_PX) {
+          touchTapCandidate.canceled = true;
+        }
+        e.preventDefault();
+        return;
+      }
+
+      if (touchGesturePanActive) return;
+    }
+
     if (!drawing || e.pointerId !== activePointerId) return;
 
     const { x, y } = getCanvasPoint(e);
@@ -2821,7 +2907,40 @@
     }
   }
 
+  function resetTouchPointerState() {
+    clearTouchTapCandidate();
+    activeTouchPointers.clear();
+    if (touchGesturePanActive) {
+      touchGesturePanActive = false;
+      updateTouchModeUI();
+    }
+  }
+
   function finishPointerStroke(e) {
+    if (e.pointerType === 'touch') {
+      const tapCandidate = (touchTapCandidate && e.pointerId === touchTapCandidate.pointerId)
+        ? touchTapCandidate
+        : null;
+
+      activeTouchPointers.delete(e.pointerId);
+      updateTouchGesturePanState();
+
+      if (tapCandidate) {
+        const isUpEvent = e.type === 'pointerup';
+        const elapsed = performance.now() - tapCandidate.startedAt;
+        const canApplyTap = isUpEvent
+          && !tapCandidate.canceled
+          && elapsed <= TOUCH_TAP_MAX_DURATION_MS
+          && touchMode === 'draw'
+          && !touchGesturePanActive;
+
+        clearTouchTapCandidate();
+        if (canApplyTap) {
+          runTapToolAction(tapCandidate.tool, tapCandidate.x, tapCandidate.y);
+        }
+      }
+    }
+
     if (!drawing || e.pointerId !== activePointerId) return;
 
     cancelPointerStroke();
@@ -2833,8 +2952,14 @@
   canvas.addEventListener('pointerup', finishPointerStroke);
   canvas.addEventListener('pointercancel', finishPointerStroke);
   canvas.addEventListener('pointerleave', finishPointerStroke);
-  window.addEventListener('blur', cancelPointerStroke);
-  fileInput.addEventListener('click', cancelPointerStroke);
+  window.addEventListener('blur', () => {
+    cancelPointerStroke();
+    resetTouchPointerState();
+  });
+  fileInput.addEventListener('click', () => {
+    cancelPointerStroke();
+    resetTouchPointerState();
+  });
 
   window.addEventListener('keydown', (e) => {
     const activeEl = document.activeElement;
