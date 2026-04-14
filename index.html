@@ -122,6 +122,13 @@
   .quick-controls .control {
     align-items: center;
   }
+  .quick-controls .btn-row {
+    gap: 6px;
+  }
+  .quick-controls .btn {
+    text-align: center;
+    padding: 7px 8px;
+  }
   .tool-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -399,6 +406,15 @@
           <span>Quick color:</span>
           <input id="quickColor" type="color" value="#808080" />
         </div>
+        <div class="btn-row">
+          <button id="quickUndoBtn" class="btn">Undo</button>
+          <button id="quickRedoBtn" class="btn">Redo</button>
+        </div>
+        <div class="btn-row">
+          <button id="quickScreenshotBtn" class="btn">Screenshot</button>
+          <button id="quickDownloadBtn" class="btn">Download</button>
+        </div>
+        <button id="quickClearBtn" class="btn">Clear Page</button>
       </div>
     </div>
     <div class="sidebar-tabs" role="tablist" aria-label="Sidebar Sections">
@@ -574,6 +590,11 @@
   const undoBtn = document.getElementById('undoBtn');
   const redoBtn = document.getElementById('redoBtn');
   const clearBtn = document.getElementById('clearBtn');
+  const quickUndoBtn = document.getElementById('quickUndoBtn');
+  const quickRedoBtn = document.getElementById('quickRedoBtn');
+  const quickClearBtn = document.getElementById('quickClearBtn');
+  const quickScreenshotBtn = document.getElementById('quickScreenshotBtn');
+  const quickDownloadBtn = document.getElementById('quickDownloadBtn');
   const paintTargetBtn = document.getElementById('paintTargetBtn');
   const statusEl = document.getElementById('status');
   const footer = document.getElementById('footer');
@@ -1363,8 +1384,12 @@
   }
 
   function updateHistoryButtons() {
-    undoBtn.disabled = undoStack.length === 0;
-    redoBtn.disabled = redoStack.length === 0;
+    const canUndo = undoStack.length > 0;
+    const canRedo = redoStack.length > 0;
+    undoBtn.disabled = !canUndo;
+    redoBtn.disabled = !canRedo;
+    if (quickUndoBtn) quickUndoBtn.disabled = !canUndo;
+    if (quickRedoBtn) quickRedoBtn.disabled = !canRedo;
   }
 
   function undo() {
@@ -2545,6 +2570,9 @@
   undoBtn.addEventListener('click', undo);
   redoBtn.addEventListener('click', redo);
   clearBtn.addEventListener('click', clearCurrentPage);
+  if (quickUndoBtn) quickUndoBtn.addEventListener('click', undo);
+  if (quickRedoBtn) quickRedoBtn.addEventListener('click', redo);
+  if (quickClearBtn) quickClearBtn.addEventListener('click', clearCurrentPage);
 
   brushRange.addEventListener('input', (e) => {
     setBrushRadius(e.target.value);
@@ -2662,6 +2690,8 @@
 
   downloadBtn.addEventListener('click', downloadComposite);
   screenshotBtn.addEventListener('click', screenshotComposite);
+  if (quickDownloadBtn) quickDownloadBtn.addEventListener('click', downloadComposite);
+  if (quickScreenshotBtn) quickScreenshotBtn.addEventListener('click', screenshotComposite);
   if (dlLink) {
     dlLink.addEventListener('click', (e) => {
       e.preventDefault();
