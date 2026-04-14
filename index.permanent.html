@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
@@ -114,6 +114,13 @@
     border: 1px solid rgba(255, 255, 255, 0.1);
     background: linear-gradient(180deg, rgba(56, 56, 56, 0.96), rgba(41, 41, 41, 0.96));
     box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
+  }
+  .quick-controls {
+    padding: 8px;
+    gap: 6px;
+  }
+  .quick-controls .control {
+    align-items: center;
   }
   .tool-grid {
     display: grid;
@@ -278,13 +285,22 @@
       border-bottom: 1px solid #000;
       gap: 8px;
       padding: 8px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      grid-template-rows: auto auto auto auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(180, 180, 180, 0.65) rgba(0, 0, 0, 0.18);
     }
+    .sidebar::-webkit-scrollbar { width: 8px; }
+    .sidebar::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.15); border-radius: 8px; }
+    .sidebar::-webkit-scrollbar-thumb { background: rgba(180, 180, 180, 0.6); border-radius: 8px; border: 2px solid rgba(0, 0, 0, 0.15); }
     .mobile-ui-toggle { display: block; }
     .sidebar.mobile-collapsed {
       max-height: 56px;
       grid-template-rows: auto;
       gap: 0;
       padding: 8px 10px;
+      overflow: hidden;
     }
     .sidebar.mobile-collapsed .tool-dock,
     .sidebar.mobile-collapsed .sidebar-tabs,
@@ -300,21 +316,40 @@
     .tool-dock h1 { display: none; }
     .tool-dock .small { display: none; }
     .tool-grid {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 6px;
     }
-    .tool-grid #tool-picker { grid-column: auto; }
+    .tool-grid #tool-picker { grid-column: 1 / -1; }
     #paintTargetBtn {
       padding: 6px 8px;
       font-size: 12px;
+    }
+    .quick-controls {
+      padding: 6px;
+      gap: 5px;
+    }
+    .quick-controls .small {
+      display: flex;
     }
 
     .tab-btn { padding: 7px 6px; font-size: 11px; }
     .panel { padding: 7px; gap: 6px; }
     .btn { padding: 7px 8px; }
     .small { font-size: 11px; }
+    .sidebar-panels {
+      height: auto;
+      overflow: visible;
+      display: block;
+    }
+    .sidebar-pane {
+      height: auto;
+      overflow: visible;
+    }
     .images-list-wrap { max-height: 156px; }
-    .sidebar-pane.active { padding-right: 0; }
+    .sidebar-pane.active {
+      overflow: visible;
+      padding-right: 0;
+    }
     .pane-stack { gap: 8px; }
 
     .action-dock { display: none; }
@@ -357,6 +392,14 @@
       </div>
       <button id="paintTargetBtn" class="btn">Paint Layer: Under Lines</button>
       <div class="small">Toggle this to mark directly on top of images.</div>
+      <div class="panel quick-controls">
+        <div class="row small">Quick brush: <span id="quickBrushLabel">10</span> px</div>
+        <input id="quickBrushRange" type="range" min="1" max="200" value="10" />
+        <div class="control small">
+          <span>Quick color:</span>
+          <input id="quickColor" type="color" value="#808080" />
+        </div>
+      </div>
     </div>
     <div class="sidebar-tabs" role="tablist" aria-label="Sidebar Sections">
       <button id="tabDraw" class="tab-btn active" data-tab="draw" type="button" role="tab" aria-selected="true" aria-controls="paneDraw">Draw</button>
@@ -515,6 +558,9 @@
 
   const brushRange = document.getElementById('brushRange');
   const brushLabel = document.getElementById('brushLabel');
+  const quickBrushRange = document.getElementById('quickBrushRange');
+  const quickBrushLabel = document.getElementById('quickBrushLabel');
+  const quickColor = document.getElementById('quickColor');
   const fillToleranceRange = document.getElementById('fillToleranceRange');
   const fillToleranceLabel = document.getElementById('fillToleranceLabel');
   const lineThresholdRange = document.getElementById('lineThresholdRange');
@@ -651,6 +697,15 @@
 
   function clamp(v, min, max) {
     return Math.max(min, Math.min(max, v));
+  }
+
+  function setBrushRadius(nextRadius) {
+    const parsed = parseInt(nextRadius, 10);
+    brushRadius = clamp(Number.isFinite(parsed) ? parsed : BRUSH_RADIUS_DEFAULT, 1, 200);
+    if (brushRange && Number(brushRange.value) !== brushRadius) brushRange.value = String(brushRadius);
+    if (quickBrushRange && Number(quickBrushRange.value) !== brushRadius) quickBrushRange.value = String(brushRadius);
+    if (brushLabel) brushLabel.textContent = String(brushRadius);
+    if (quickBrushLabel) quickBrushLabel.textContent = String(brushRadius);
   }
 
   function fitWithinDimensions(width, height, maxSide = MAX_IMAGE_DIMENSION) {
@@ -1026,7 +1081,9 @@
 
   function setColor(nextColor) {
     currentColor = [nextColor[0], nextColor[1], nextColor[2]];
-    customColor.value = toHex(currentColor);
+    const hex = toHex(currentColor);
+    customColor.value = hex;
+    if (quickColor) quickColor.value = hex;
     updatePaletteActive();
   }
 
@@ -2490,9 +2547,14 @@
   clearBtn.addEventListener('click', clearCurrentPage);
 
   brushRange.addEventListener('input', (e) => {
-    brushRadius = parseInt(e.target.value, 10);
-    brushLabel.textContent = brushRadius;
+    setBrushRadius(e.target.value);
   });
+
+  if (quickBrushRange) {
+    quickBrushRange.addEventListener('input', (e) => {
+      setBrushRadius(e.target.value);
+    });
+  }
 
   fillToleranceRange.addEventListener('input', (e) => {
     fillTolerance = parseInt(e.target.value, 10);
@@ -2535,6 +2597,15 @@
     setColor(parsed);
     if (currentTool === 'picker') setTool('brush');
   });
+
+  if (quickColor) {
+    quickColor.addEventListener('input', (e) => {
+      const parsed = parseHexColor(e.target.value);
+      if (!parsed) return;
+      setColor(parsed);
+      if (currentTool === 'picker') setTool('brush');
+    });
+  }
 
   convertUploadsToggle.addEventListener('change', (e) => {
     if (!ALLOW_USER_UPLOADS) {
@@ -2794,15 +2865,11 @@
     if (e.key === 'i' || e.key === 'I') setTool('picker');
 
     if (e.key === '+' || e.key === '=') {
-      brushRadius = Math.min(200, brushRadius + 1);
-      brushRange.value = brushRadius;
-      brushLabel.textContent = brushRadius;
+      setBrushRadius(brushRadius + 1);
     }
 
     if (e.key === '-' || e.key === '_') {
-      brushRadius = Math.max(1, brushRadius - 1);
-      brushRange.value = brushRadius;
-      brushLabel.textContent = brushRadius;
+      setBrushRadius(brushRadius - 1);
     }
 
     if (e.key === 'ArrowRight' || e.key === '.') switchImage(+1);
@@ -3009,7 +3076,7 @@
     applyMobileSidebarLayout(IS_TOUCH_DEVICE && isCompactLayout());
     setPaintTarget('under', true);
 
-    brushLabel.textContent = brushRadius;
+    setBrushRadius(brushRadius);
     fillToleranceLabel.textContent = fillTolerance;
     lineThresholdLabel.textContent = lineThreshold;
     gradientAngleRange.value = String(gradientAngle);
@@ -3017,7 +3084,7 @@
     gradientStartColorInput.value = toHex(gradientStartColor);
     gradientEndColorInput.value = toHex(gradientEndColor);
     gradientShapeSelect.value = gradientShape;
-    customColor.value = toHex(currentColor);
+    setColor(currentColor);
     convertUploadsToggle.checked = convertUploadsEnabled;
     convertThresholdRange.value = String(convertEdgeThreshold);
     convertThresholdLabel.textContent = String(convertEdgeThreshold);
