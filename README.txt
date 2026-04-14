@@ -40,6 +40,7 @@ Core tools
 - Gradient is boundary-locked under line art and will not paint over outlines.
 - Converter controls: edge threshold, line thickness, and despeckle size.
 - Mouse, touch, and stylus drawing support.
+- Mobile comfort controls: `Hide/Show Tools & Panels` collapses the sidebar, and `Touch: Scroll/Draw` switches between panning and painting.
 
 Notes
 - Works from any folder or USB drive.
@@ -62,6 +63,10 @@ VS Code / Codex start
 - Main file: index.html
 - Run locally: double-click Start Paint Lab Coloring App.cmd
 - Converter integration point (for future module split): appendUploadedFiles() and convertImageFileToTransparentLineArt().
+
+
+
+
 
 
 

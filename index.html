@@ -33,7 +33,7 @@
     --topbar-space: 58px;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; }
+  html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif; }
   .app { display: grid; grid-template-columns: var(--ui) 1fr; height: 100vh; height: 100dvh; overflow: hidden; }
   .sidebar {
     background: var(--panel);
@@ -148,6 +148,7 @@
   .btn { width: 100%; border: 0; border-radius: 8px; padding: 8px 10px; background: #474747; color: #fff; cursor: pointer; text-align: left; }
   .btn.active { background: #6a6a6a; }
   .btn[disabled] { opacity: 0.45; cursor: not-allowed; }
+  .mobile-ui-toggle { display: none; text-align: center; font-weight: 600; }
   .btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .control { display: flex; align-items: center; gap: 8px; }
@@ -264,21 +265,61 @@
   }
   a.download { color: #fff; text-decoration: none; background: #3a7c3a; padding: 6px 10px; border-radius: 8px; }
   @media (max-width: 900px) {
-    .app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-    .sidebar { max-height: 68vh; border-right: 0; border-bottom: 1px solid #000; }
+    .app {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto minmax(0, 1fr);
+      height: 100svh;
+      height: 100dvh;
+    }
+    .sidebar {
+      max-height: min(52dvh, 420px);
+      border-right: 0;
+      border-bottom: 1px solid #000;
+    }
+    .mobile-ui-toggle { display: block; }
+    .sidebar.mobile-collapsed {
+      max-height: 56px;
+      grid-template-rows: auto;
+      gap: 0;
+      padding: 8px 10px;
+    }
+    .sidebar.mobile-collapsed .tool-dock,
+    .sidebar.mobile-collapsed .sidebar-tabs,
+    .sidebar.mobile-collapsed .sidebar-panels,
+    .sidebar.mobile-collapsed .action-dock {
+      display: none;
+    }
     .tab-btn { padding: 8px 6px; font-size: 11px; }
     .panel { padding: 8px; gap: 6px; }
     .btn { padding: 7px 8px; }
     .small { font-size: 11px; }
     .images-list-wrap { max-height: 180px; }
-    .topbar { left: 0; flex-wrap: wrap; }
-    .canvas-viewport { padding-top: 76px; }
+    .topbar {
+      left: 0;
+      flex-wrap: nowrap;
+      gap: 6px;
+      padding: 6px 8px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .topbar::-webkit-scrollbar { display: none; }
+    .topbar .pill { white-space: nowrap; flex: 0 0 auto; }
+    .topbar .pill:nth-child(1),
+    .topbar .pill:nth-child(2),
+    .topbar .pill:nth-child(3) {
+      display: none;
+    }
+    .canvas-viewport {
+      padding-top: 56px;
+      padding-bottom: calc(92px + env(safe-area-inset-bottom));
+    }
   }
 </style>
 </head>
 <body>
 <div class="app">
   <aside class="sidebar">
+    <button id="mobileUiToggleBtn" class="btn mobile-ui-toggle hidden" type="button" aria-expanded="true">Hide Tools & Panels</button>
     <div class="tool-dock">
       <h1>Tools</h1>
       <div class="tool-grid">
@@ -489,7 +530,9 @@
   const zoomValueLabel = document.getElementById('zoomValueLabel');
   const touchModePill = document.getElementById('touchModePill');
   const touchModeBtn = document.getElementById('touchModeBtn');
+  const mobileUiToggleBtn = document.getElementById('mobileUiToggleBtn');
   const downloadBtn = document.getElementById('downloadBtn');
+  const sidebarEl = document.querySelector('.sidebar');
   const tabBtns = [...document.querySelectorAll('.tab-btn')];
   const sidebarPanes = {
     draw: document.getElementById('paneDraw'),
@@ -998,6 +1041,45 @@
     canvas.style.touchAction = drawMode ? 'none' : 'pan-x pan-y pinch-zoom';
   }
 
+  function isCompactLayout() {
+    return window.matchMedia('(max-width: 900px)').matches;
+  }
+
+  function updateMobileUiToggleLabel() {
+    if (!mobileUiToggleBtn || !sidebarEl) return;
+    const collapsed = sidebarEl.classList.contains('mobile-collapsed');
+    mobileUiToggleBtn.textContent = collapsed ? 'Show Tools & Panels' : 'Hide Tools & Panels';
+    mobileUiToggleBtn.setAttribute('aria-expanded', String(!collapsed));
+  }
+
+  function applyMobileSidebarLayout(forceCollapsed = null) {
+    if (!mobileUiToggleBtn || !sidebarEl) return;
+
+    const compact = isCompactLayout();
+    mobileUiToggleBtn.classList.toggle('hidden', !compact);
+
+    if (!compact) {
+      sidebarEl.classList.remove('mobile-collapsed');
+      updateMobileUiToggleLabel();
+      return;
+    }
+
+    if (typeof forceCollapsed === 'boolean') {
+      sidebarEl.classList.toggle('mobile-collapsed', forceCollapsed);
+    }
+
+    updateMobileUiToggleLabel();
+  }
+
+  function setMobileSidebarCollapsed(collapsed, silent = false) {
+    if (!sidebarEl || !isCompactLayout()) return;
+    const next = !!collapsed;
+    sidebarEl.classList.toggle('mobile-collapsed', next);
+    updateMobileUiToggleLabel();
+    if (!silent) {
+      setStatus(next ? 'Tools hidden. Tap "Show Tools & Panels" to open controls.' : 'Tools shown.');
+    }
+  }
   function setTouchMode(nextMode, silent = false) {
     touchMode = nextMode === 'draw' ? 'draw' : 'pan';
     if (touchMode === 'draw') touchScrollHintShown = false;
@@ -2493,6 +2575,12 @@
   if (zoomInBtn) zoomInBtn.addEventListener('click', () => nudgeCanvasScale(1));
   if (zoomFitBtn) zoomFitBtn.addEventListener('click', () => fitCanvasToViewport());
   if (touchModeBtn) touchModeBtn.addEventListener('click', () => setTouchMode(touchMode === 'draw' ? 'pan' : 'draw'));
+  if (mobileUiToggleBtn) {
+    mobileUiToggleBtn.addEventListener('click', () => {
+      const collapsed = sidebarEl ? sidebarEl.classList.contains('mobile-collapsed') : false;
+      setMobileSidebarCollapsed(!collapsed);
+    });
+  }
 
   if (canvasViewport) {
     canvasViewport.addEventListener('wheel', (e) => {
@@ -2503,6 +2591,7 @@
   }
 
   window.addEventListener('resize', () => {
+    applyMobileSidebarLayout();
     if (!canvasViewport) return;
     const fitScale = computeFitScale();
     if (canvasScale < fitScale) {
@@ -2517,8 +2606,7 @@
   canvas.addEventListener('pointerdown', (e) => {
     if (!images.length) return;
 
-    const brushLikeTool = currentTool === 'brush' || currentTool === 'eraser';
-    if (e.pointerType === 'touch' && brushLikeTool && touchMode !== 'draw') {
+    if (e.pointerType === 'touch' && touchMode !== 'draw') {
       if (!touchScrollHintShown) {
         setStatus('Touch mode is Scroll. Tap "Touch: Scroll" to switch to Draw.');
         touchScrollHintShown = true;
@@ -2887,6 +2975,7 @@
     buildPalette();
     setTool('brush');
     setTouchMode(touchMode, true);
+    applyMobileSidebarLayout(IS_TOUCH_DEVICE && isCompactLayout());
     setPaintTarget('under', true);
 
     brushLabel.textContent = brushRadius;
@@ -2950,6 +3039,17 @@
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
 
 
 
