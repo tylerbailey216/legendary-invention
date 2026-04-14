@@ -668,6 +668,8 @@
   let touchTapCandidate = null;
   const activeTouchPointers = new Set();
   let touchGesturePanActive = false;
+  const touchPointerPositions = new Map();
+  let touchPinchGesture = null;
 
   const MIN_CANVAS_SCALE = 0.2;
   const MAX_CANVAS_SCALE = 4;
@@ -1154,7 +1156,7 @@
     }
 
     const effectiveDrawMode = drawMode && !touchGesturePanActive;
-    canvas.style.touchAction = effectiveDrawMode ? 'none' : 'pan-x pan-y pinch-zoom';
+    canvas.style.touchAction = effectiveDrawMode ? 'none' : 'pan-x pan-y';
   }
 
   function isCompactLayout() {
@@ -2493,9 +2495,62 @@
     if (touchGesturePanActive) {
       clearTouchTapCandidate();
       cancelPointerStroke();
+      startTouchPinchGesture();
+    } else {
+      touchPinchGesture = null;
     }
 
     updateTouchModeUI();
+  }
+
+  function getTouchPointsPair() {
+    if (touchPointerPositions.size < 2) return null;
+    const iter = touchPointerPositions.values();
+    const p1 = iter.next().value;
+    const p2 = iter.next().value;
+    if (!p1 || !p2) return null;
+    return [p1, p2];
+  }
+
+  function startTouchPinchGesture() {
+    if (!canvasViewport) return;
+    const pair = getTouchPointsPair();
+    if (!pair) return;
+
+    const [p1, p2] = pair;
+    const distance = Math.hypot(p2.clientX - p1.clientX, p2.clientY - p1.clientY);
+    const midX = (p1.clientX + p2.clientX) * 0.5;
+    const midY = (p1.clientY + p2.clientY) * 0.5;
+
+    touchPinchGesture = {
+      startDistance: Math.max(8, distance),
+      startScale: canvasScale,
+      startMidX: midX,
+      startMidY: midY,
+      startScrollLeft: canvasViewport.scrollLeft,
+      startScrollTop: canvasViewport.scrollTop
+    };
+  }
+
+  function updateTouchPinchGesture() {
+    if (!touchGesturePanActive || !touchPinchGesture || !canvasViewport) return;
+
+    const pair = getTouchPointsPair();
+    if (!pair) return;
+
+    const [p1, p2] = pair;
+    const distance = Math.max(8, Math.hypot(p2.clientX - p1.clientX, p2.clientY - p1.clientY));
+    const ratio = distance / touchPinchGesture.startDistance;
+    const nextScale = clamp(touchPinchGesture.startScale * ratio, MIN_CANVAS_SCALE, MAX_CANVAS_SCALE);
+    applyCanvasScale(nextScale, { preserveCenter: false, silent: true });
+
+    const midX = (p1.clientX + p2.clientX) * 0.5;
+    const midY = (p1.clientY + p2.clientY) * 0.5;
+    const dx = midX - touchPinchGesture.startMidX;
+    const dy = midY - touchPinchGesture.startMidY;
+
+    canvasViewport.scrollLeft = Math.max(0, touchPinchGesture.startScrollLeft - dx);
+    canvasViewport.scrollTop = Math.max(0, touchPinchGesture.startScrollTop - dy);
   }
   function clearCurrentPage() {
     if (!images.length) return;
@@ -2820,9 +2875,11 @@
 
     if (e.pointerType === 'touch') {
       activeTouchPointers.add(e.pointerId);
+      touchPointerPositions.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
       updateTouchGesturePanState();
 
       if (touchGesturePanActive) {
+        startTouchPinchGesture();
         e.preventDefault();
         return;
       }
@@ -2874,6 +2931,8 @@
 
   canvas.addEventListener('pointermove', (e) => {
     if (e.pointerType === 'touch') {
+      touchPointerPositions.set(e.pointerId, { clientX: e.clientX, clientY: e.clientY });
+
       if (touchTapCandidate && e.pointerId === touchTapCandidate.pointerId) {
         const { x, y } = getCanvasPoint(e);
         if (Math.hypot(x - touchTapCandidate.x, y - touchTapCandidate.y) > TOUCH_TAP_MAX_MOVE_PX) {
@@ -2883,7 +2942,11 @@
         return;
       }
 
-      if (touchGesturePanActive) return;
+      if (touchGesturePanActive) {
+        updateTouchPinchGesture();
+        e.preventDefault();
+        return;
+      }
     }
 
     if (!drawing || e.pointerId !== activePointerId) return;
@@ -2910,6 +2973,8 @@
   function resetTouchPointerState() {
     clearTouchTapCandidate();
     activeTouchPointers.clear();
+    touchPointerPositions.clear();
+    touchPinchGesture = null;
     if (touchGesturePanActive) {
       touchGesturePanActive = false;
       updateTouchModeUI();
@@ -2923,6 +2988,10 @@
         : null;
 
       activeTouchPointers.delete(e.pointerId);
+      touchPointerPositions.delete(e.pointerId);
+      if (activeTouchPointers.size < 2) {
+        touchPinchGesture = null;
+      }
       updateTouchGesturePanState();
 
       if (tapCandidate) {
