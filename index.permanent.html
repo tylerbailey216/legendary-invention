@@ -264,6 +264,7 @@
     margin: 0;
   }
   a.download { color: #fff; text-decoration: none; background: #3a7c3a; padding: 6px 10px; border-radius: 8px; }
+  #mobileScreenshotPill { display: none; }
   @media (max-width: 900px) {
     .app {
       grid-template-columns: 1fr;
@@ -272,9 +273,11 @@
       height: 100dvh;
     }
     .sidebar {
-      max-height: min(52dvh, 420px);
+      max-height: min(84dvh, 760px);
       border-right: 0;
       border-bottom: 1px solid #000;
+      gap: 8px;
+      padding: 8px;
     }
     .mobile-ui-toggle { display: block; }
     .sidebar.mobile-collapsed {
@@ -289,11 +292,34 @@
     .sidebar.mobile-collapsed .action-dock {
       display: none;
     }
-    .tab-btn { padding: 8px 6px; font-size: 11px; }
-    .panel { padding: 8px; gap: 6px; }
+
+    .tool-dock {
+      gap: 6px;
+      padding: 6px;
+    }
+    .tool-dock h1 { display: none; }
+    .tool-dock .small { display: none; }
+    .tool-grid {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .tool-grid #tool-picker { grid-column: auto; }
+    #paintTargetBtn {
+      padding: 6px 8px;
+      font-size: 12px;
+    }
+
+    .tab-btn { padding: 7px 6px; font-size: 11px; }
+    .panel { padding: 7px; gap: 6px; }
     .btn { padding: 7px 8px; }
     .small { font-size: 11px; }
-    .images-list-wrap { max-height: 180px; }
+    .images-list-wrap { max-height: 156px; }
+    .sidebar-pane.active { padding-right: 0; }
+    .pane-stack { gap: 8px; }
+
+    .action-dock { display: none; }
+
+    #mobileScreenshotPill { display: inline-flex; }
     .topbar {
       left: 0;
       flex-wrap: nowrap;
@@ -446,6 +472,9 @@
       <div id="touchModePill" class="pill hidden">
         <button id="touchModeBtn" class="zoom-btn fit" type="button" aria-label="Toggle touch interaction mode">Touch: Scroll</button>
       </div>
+            <div id="mobileScreenshotPill" class="pill">
+        <button id="mobileScreenshotBtn" class="zoom-btn fit" type="button" aria-label="Take screenshot">Screenshot</button>
+      </div>
       <div class="pill"><a id="dlLink" class="download" href="#" download="colored.png">Download PNG</a></div>
     </div>
     <div id="canvasViewport" class="canvas-viewport">
@@ -530,6 +559,7 @@
   const zoomValueLabel = document.getElementById('zoomValueLabel');
   const touchModePill = document.getElementById('touchModePill');
   const touchModeBtn = document.getElementById('touchModeBtn');
+  const mobileScreenshotBtn = document.getElementById('mobileScreenshotBtn');
   const mobileUiToggleBtn = document.getElementById('mobileUiToggleBtn');
   const downloadBtn = document.getElementById('downloadBtn');
   const sidebarEl = document.querySelector('.sidebar');
@@ -2575,6 +2605,7 @@
   if (zoomInBtn) zoomInBtn.addEventListener('click', () => nudgeCanvasScale(1));
   if (zoomFitBtn) zoomFitBtn.addEventListener('click', () => fitCanvasToViewport());
   if (touchModeBtn) touchModeBtn.addEventListener('click', () => setTouchMode(touchMode === 'draw' ? 'pan' : 'draw'));
+  if (mobileScreenshotBtn) mobileScreenshotBtn.addEventListener('click', screenshotComposite);
   if (mobileUiToggleBtn) {
     mobileUiToggleBtn.addEventListener('click', () => {
       const collapsed = sidebarEl ? sidebarEl.classList.contains('mobile-collapsed') : false;
@@ -3039,6 +3070,14 @@
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
 
 
 
