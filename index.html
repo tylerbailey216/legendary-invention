@@ -167,6 +167,7 @@
     inset: 0;
     overflow: auto;
     overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
     padding: var(--topbar-space) 14px 36px;
     scrollbar-width: thin;
     scrollbar-color: rgba(180, 180, 180, 0.65) rgba(0, 0, 0, 0.18);
@@ -182,7 +183,7 @@
     max-height: none;
     margin: 0 auto;
     background: #323232;
-    touch-action: none;
+    touch-action: pan-x pan-y pinch-zoom;
     cursor: crosshair;
   }
   .footer { position: absolute; left: 0; right: 0; bottom: 0; padding: 6px 10px; color: #ddd; font-size: 12px; background: linear-gradient(180deg, rgba(0,0,0,0) 0, rgba(0,0,0,0.45) 80%); }
@@ -401,6 +402,9 @@
         <button id="zoomInBtn" class="zoom-btn" type="button" aria-label="Zoom in">+</button>
         <span id="zoomValueLabel" class="zoom-value">100%</span>
       </div>
+      <div id="touchModePill" class="pill hidden">
+        <button id="touchModeBtn" class="zoom-btn fit" type="button" aria-label="Toggle touch interaction mode">Touch: Scroll</button>
+      </div>
       <div class="pill"><a id="dlLink" class="download" href="#" download="colored.png">Download PNG</a></div>
     </div>
     <div id="canvasViewport" class="canvas-viewport">
@@ -483,6 +487,8 @@
   const zoomInBtn = document.getElementById('zoomInBtn');
   const zoomFitBtn = document.getElementById('zoomFitBtn');
   const zoomValueLabel = document.getElementById('zoomValueLabel');
+  const touchModePill = document.getElementById('touchModePill');
+  const touchModeBtn = document.getElementById('touchModeBtn');
   const downloadBtn = document.getElementById('downloadBtn');
   const tabBtns = [...document.querySelectorAll('.tab-btn')];
   const sidebarPanes = {
@@ -514,6 +520,9 @@
   let convertEdgeThreshold = 145;
   let convertLineThickness = 1;
   let convertDespeckleSize = 30;
+  const IS_TOUCH_DEVICE = window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+  let touchMode = IS_TOUCH_DEVICE ? 'pan' : 'draw';
+  let touchScrollHintShown = false;
 
   const MIN_CANVAS_SCALE = 0.2;
   const MAX_CANVAS_SCALE = 4;
@@ -969,6 +978,38 @@
       const active = c[0] === currentColor[0] && c[1] === currentColor[1] && c[2] === currentColor[2];
       el.classList.toggle('active', active);
     });
+  }
+
+  function updateTouchModeUI() {
+    const showControl = IS_TOUCH_DEVICE;
+    if (touchModePill) touchModePill.classList.toggle('hidden', !showControl);
+
+    if (!showControl) {
+      canvas.style.touchAction = 'none';
+      return;
+    }
+
+    const drawMode = touchMode === 'draw';
+    if (touchModeBtn) {
+      touchModeBtn.textContent = drawMode ? 'Touch: Draw' : 'Touch: Scroll';
+      touchModeBtn.classList.toggle('active', drawMode);
+    }
+
+    canvas.style.touchAction = drawMode ? 'none' : 'pan-x pan-y pinch-zoom';
+  }
+
+  function setTouchMode(nextMode, silent = false) {
+    touchMode = nextMode === 'draw' ? 'draw' : 'pan';
+    if (touchMode === 'draw') touchScrollHintShown = false;
+    updateTouchModeUI();
+
+    if (!silent) {
+      setStatus(
+        touchMode === 'draw'
+          ? 'Touch mode: Draw. Drag on image to paint.'
+          : 'Touch mode: Scroll. Swipe to move around the full image.'
+      );
+    }
   }
 
   function setTool(t) {
@@ -2451,6 +2492,7 @@
   if (zoomOutBtn) zoomOutBtn.addEventListener('click', () => nudgeCanvasScale(-1));
   if (zoomInBtn) zoomInBtn.addEventListener('click', () => nudgeCanvasScale(1));
   if (zoomFitBtn) zoomFitBtn.addEventListener('click', () => fitCanvasToViewport());
+  if (touchModeBtn) touchModeBtn.addEventListener('click', () => setTouchMode(touchMode === 'draw' ? 'pan' : 'draw'));
 
   if (canvasViewport) {
     canvasViewport.addEventListener('wheel', (e) => {
@@ -2474,6 +2516,15 @@
 
   canvas.addEventListener('pointerdown', (e) => {
     if (!images.length) return;
+
+    const brushLikeTool = currentTool === 'brush' || currentTool === 'eraser';
+    if (e.pointerType === 'touch' && brushLikeTool && touchMode !== 'draw') {
+      if (!touchScrollHintShown) {
+        setStatus('Touch mode is Scroll. Tap "Touch: Scroll" to switch to Draw.');
+        touchScrollHintShown = true;
+      }
+      return;
+    }
 
     const { x, y } = getCanvasPoint(e);
 
@@ -2835,6 +2886,7 @@
   (async function init() {
     buildPalette();
     setTool('brush');
+    setTouchMode(touchMode, true);
     setPaintTarget('under', true);
 
     brushLabel.textContent = brushRadius;
@@ -2898,6 +2950,13 @@
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
 
 
 
